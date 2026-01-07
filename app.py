@@ -13,7 +13,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚖️ 雙軌制回饋決策模型 (商品抽成獨立變數)")
+st.title("⚖️ 分潤試算工具")
 st.markdown("""
 本模型採 **雙軌疊加** 計算：
 1. **場地租金 (區間變數)**：依照 5 階層折扣率，計算場租節省區間。
