@@ -1,27 +1,33 @@
 import streamlit as st
 import pandas as pd
-import altair as alt
+import openai
 
 # --- 1. 頁面基礎設定 ---
-st.set_page_config(page_title="雙軌制回饋分析模型 (數值輸入版)", layout="wide")
+st.set_page_config(page_title="雙軌制回饋分析模型 (AI 顧問版)", layout="wide")
 
 st.markdown("""
 <style>
     .stMetric { background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0; }
     div[data-testid="stDataFrame"] { font-size: 1.1rem; }
     .big-font { font-size: 1.2rem; font-weight: bold; }
+    .stButton button { width: 100%; background-color: #FF4B4B; color: white; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚖️ 分潤試算工具 (數值輸入版)")
+st.title("⚖️ 分潤試算工具 (AI 顧問版)")
 st.markdown("""
-本模型採 **雙軌疊加** 計算：
+本模型採 **雙軌疊加** 計算，表格下方提供 AI 智能分析：
 1. **場地租金 (區間變數)**：依照 11 階層折扣率，計算場租節省區間。
 2. **商品抽成 (獨立變數)**：依照設定的 **「減免百分比」**，計算固定節省金額與對分利潤。
 """)
 
 # --- 2. 側邊欄：參數設定 ---
 with st.sidebar:
+    st.header("🔑 OpenAI 設定")
+    api_key = st.text_input("輸入 OpenAI API Key", type="password", help="請輸入您的 API Key 以啟用 AI 分析功能")
+    
+    st.divider()
+
     st.header("1. 營業預估收入 (Gross)")
     ticket_gross = st.number_input("🎫 票券營業額預估", value=14_400_000, step=100000, format="%d")
     merch_gross = st.number_input("🛍️ 商品營業額預估", value=15_000_000, step=100000, format="%d")
@@ -38,7 +44,7 @@ with st.sidebar:
     st.header("3. 票券抽成（按目標）")
     st.info("請直接輸入百分比數值 (例如 6.5 代表 6.5%)")
     
-    # --- 修改部分：改用 st.number_input，並填入您指定的預設值 ---
+    # 輸入框設定 (保留您的預設值)
     p0  = st.number_input("Lv0. 租金減免 0% (無折扣)",  min_value=0.0, max_value=100.0, value=6.0, step=0.1, format="%.2f") / 100
     p1  = st.number_input("Lv1. 租金減免 1~10%",      min_value=0.0, max_value=100.0, value=6.5, step=0.1, format="%.2f") / 100
     p2  = st.number_input("Lv2. 租金減免 11~20%",     min_value=0.0, max_value=100.0, value=7.0, step=0.1, format="%.2f") / 100
@@ -50,14 +56,11 @@ with st.sidebar:
     p8  = st.number_input("Lv8. 租金減免 71~80%",     min_value=0.0, max_value=100.0, value=10.0, step=0.1, format="%.2f") / 100
     p9  = st.number_input("Lv9. 租金減免 81~90%",     min_value=0.0, max_value=100.0, value=15.0, step=0.1, format="%.2f") / 100
     p10 = st.number_input("Lv10. 租金減免 91~100%",   min_value=0.0, max_value=100.0, value=15.0, step=0.1, format="%.2f") / 100
-    # --- 修改部分結束 ---
 
     st.divider()
     
     st.header("4. 商品抽成")
-    st.markdown("設定 對方談到的 **抽成減免幅度**：")
     
-    # 改為輸入框
     merch_reduction_pct = st.number_input(
         "減免百分比 (%)", 
         min_value=0.0, 
@@ -67,7 +70,6 @@ with st.sidebar:
         format="%.2f"
     )
     
-    # 計算商品端的固定價值與回饋
     merch_savings_fixed = merch_gross * (merch_reduction_pct / 100)
     merch_payout_fixed = merch_savings_fixed / 2
     
@@ -75,7 +77,6 @@ with st.sidebar:
 
 # --- 3. 核心邏輯運算 ---
 
-# 定義場租區間 (Lv0 ~ Lv10)
 tiers_config = [
     {"等級": "Lv0",  "min_disc": 0.00, "max_disc": 0.00, "rent_payout_pct": p0},
     {"等級": "Lv1",  "min_disc": 0.01, "max_disc": 0.10, "rent_payout_pct": p1},
@@ -93,52 +94,38 @@ tiers_config = [
 results = []
 
 for t in tiers_config:
-    # --- 軌道一：場地租金 (變動區間) ---
-    # 1. 票券分潤支付
     rent_payout = ticket_gross * t["rent_payout_pct"]
-    
-    # 2. 場租價值區間 (省下的租金)
     rent_savings_min = base_rent * t["min_disc"]
     rent_savings_max = base_rent * t["max_disc"]
     
-    # --- 軌道二：商品抽成 (固定變數) ---
-    # *註：這裡的數值來自側邊欄設定*
-    
-    # --- 總和計算 (疊加) ---
-    # 總價值 (Min ~ Max)
     total_savings_min = rent_savings_min + merch_savings_fixed
     total_savings_max = rent_savings_max + merch_savings_fixed
     
-    # 總支付 (Single Value)
     total_payout = rent_payout + merch_payout_fixed
     
-    # 淨效益 (Min ~ Max)
     net_min = total_savings_min - total_payout
     net_max = total_savings_max - total_payout
     
-    # 狀態判斷
     if net_min > 0:
         status = "✅ 絕對獲利"
-        color = "#2ecc71" # Green
+        color = "#2ecc71"
     elif net_max < 0:
         status = "❌ 絕對虧損"
-        color = "#e74c3c" # Red
+        color = "#e74c3c"
     else:
         status = "⚠️ 浮動風險"
-        color = "#f1c40f" # Orange
+        color = "#f1c40f"
 
     results.append({
         "等級": t["等級"],
         "場租折扣": f"{int(t['min_disc']*100)}%~{int(t['max_disc']*100)}%",
-        "票券分潤": rent_payout,
-        "商品分潤": merch_payout_fixed,
+        "票券分潤%": f"{t['rent_payout_pct']*100:.1f}%",
         "總支付 Cost": total_payout,
         "總價值 Min": total_savings_min,
         "總價值 Max": total_savings_max,
         "淨效益 Min": net_min,
         "淨效益 Max": net_max,
-        "狀態": status,
-        "Color": color
+        "狀態": status
     })
 
 df = pd.DataFrame(results)
@@ -152,69 +139,72 @@ col3.metric("商品減免設定", f"減免 {merch_reduction_pct}%")
 
 st.divider()
 
-# --- Chart: 區間四象限圖 ---
-st.subheader(f"🎯 情境分析 (當商品減免 {merch_reduction_pct}% 時)")
-
-chart_data = df.copy()
-# 設定圖表最大值，防止破圖，給 10% 緩衝
-max_val = max(chart_data["總支付 Cost"].max(), chart_data["總價值 Max"].max()) * 1.1
-
-base = alt.Chart(chart_data).encode(
-    x=alt.X('總支付 Cost', title='總支付成本 (票券分潤 + 商品對分)', scale=alt.Scale(domain=[0, max_val]))
-)
-
-# 1. 垂直線 (Range Bar)
-rule = base.mark_rule(size=3).encode(
-    y=alt.Y('總價值 Min', title='A公司創造總價值 (租金+商品)', scale=alt.Scale(domain=[0, max_val])),
-    y2='總價值 Max',
-    color=alt.Color('Color', scale=None),
-    tooltip=['等級', '場租折扣', '狀態', '淨效益 Min', '淨效益 Max']
-)
-
-# 2. 端點
-points_min = base.mark_point(filled=True, shape='triangle-down', size=100).encode(
-    y='總價值 Min', color=alt.Color('Color', scale=None)
-)
-points_max = base.mark_point(filled=True, shape='triangle-up', size=100).encode(
-    y='總價值 Max', color=alt.Color('Color', scale=None)
-)
-
-# 3. 文字
-text = base.mark_text(dy=-15, align='center', fontSize=10, fontWeight='bold').encode(
-    y='總價值 Max', text='等級'
-)
-
-# 4. 損益平衡線 (45度線)
-line = alt.Chart(pd.DataFrame({'x': [0, max_val], 'y': [0, max_val]})).mark_rule(
-    strokeDash=[5, 5], color='gray', opacity=0.5
-).encode(x='x', y='y')
-
-final_chart = (rule + points_min + points_max + text + line).properties(height=600).interactive()
-st.altair_chart(final_chart, use_container_width=True)
-
-# --- Table: 詳細數據 ---
+# --- 移除圖表，只保留表格並上提 ---
 st.subheader("📊 損益明細表")
 
-# 格式化
+# 準備顯示用的 DataFrame
 display_df = df.copy()
 display_df["淨效益區間"] = display_df.apply(lambda r: f"${r['淨效益 Min']:,.0f} ~ ${r['淨效益 Max']:,.0f}", axis=1)
+display_df["總支付 Cost"] = display_df["總支付 Cost"].apply(lambda x: f"${x:,.0f}")
+display_df["總價值 Min"] = display_df["總價值 Min"].apply(lambda x: f"${x:,.0f}")
+display_df["總價值 Max"] = display_df["總價值 Max"].apply(lambda x: f"${x:,.0f}")
 
-final_table = display_df[["等級", "場租折扣", "票券分潤", "商品分潤", "總支付 Cost", "總價值 Min", "總價值 Max", "淨效益區間", "狀態"]]
+final_table = display_df[["等級", "場租折扣", "票券分潤%", "總支付 Cost", "總價值 Min", "總價值 Max", "淨效益區間", "狀態"]]
 
 st.dataframe(
-    final_table.style.format({
-        "票券分潤": "${:,.0f}",
-        "商品分潤": "${:,.0f}",
-        "總支付 Cost": "${:,.0f}",
-        "總價值 Min": "${:,.0f}",
-        "總價值 Max": "${:,.0f}",
-    }).applymap(lambda v: f"color: {v.split(' ')[0] if 'color' in v else 'black'}", subset=["狀態"]),
+    final_table.style.applymap(lambda v: f"color: {v.split(' ')[0] if 'color' in v else 'black'}", subset=["狀態"]),
     use_container_width=True
 )
 
-st.info(f"""
-**💡 如何解讀此圖表：**
-* **X軸 (橫軸)**：您付出的總成本。
-* **Y軸 (縱軸)**：對方創造的總價值 (省下的錢)。
-* **虛線**：損益平衡線。圖形在虛線 **上方** 代表賺錢 (綠色)，在 **下方** 代表虧錢 (紅色)。
-""")
+st.divider()
+
+# --- 新增 OpenAI 建議視窗 ---
+st.subheader("🤖 AI 談判顧問建議")
+
+# 檢查是否有輸入 API Key
+if not api_key:
+    st.warning("請先在左側欄位輸入 OpenAI API Key 才能啟用智能分析功能。")
+else:
+    if st.button("生成分析報告"):
+        with st.spinner("AI 正在分析您的財務模型..."):
+            try:
+                # 1. 將 Dataframe 轉為 CSV 格式字串，讓 AI 讀取
+                df_csv = df.to_csv(index=False)
+                
+                # 2. 構建 Prompt
+                system_msg = "你是一位專業的財務談判顧問，擅長分析成本結構與商業損益。"
+                user_msg = f"""
+                以下是我們針對一個合作案的「雙軌制分潤模型」試算結果。
+                
+                **背景參數：**
+                - 票券營收：{ticket_gross:,}
+                - 原本場租：{base_rent:,}
+                - 商品營收：{merch_gross:,}
+                - 商品減免：{merch_reduction_pct}%
+                
+                **試算表數據 (Lv0~Lv10 代表場租折扣程度)：**
+                {df_csv}
+                
+                **請幫我做以下分析 (請用繁體中文，條列式，語氣專業且直接)：**
+                1. **總結現況**：目前的參數設定下，整體是偏向獲利還是虧損？
+                2. **關鍵風險**：指出哪些等級(Level)是不合理的？(例如付出的分潤大於省下的錢)。
+                3. **談判建議**：如果我要達到損益兩平或獲利，我應該調整哪個參數？(例如票券分潤%應該壓在多少以下？或是商品減免需要提升多少？)
+                """
+
+                # 3. 呼叫 OpenAI API
+                client = openai.OpenAI(api_key=api_key)
+                response = client.chat.completions.create(
+                    model="gpt-4o", # 或 gpt-3.5-turbo
+                    messages=[
+                        {"role": "system", "content": system_msg},
+                        {"role": "user", "content": user_msg}
+                    ],
+                    temperature=0.7
+                )
+                
+                # 4. 顯示結果
+                analysis_content = response.choices[0].message.content
+                st.markdown(analysis_content)
+                
+            except Exception as e:
+                st.error(f"發生錯誤：{str(e)}")
