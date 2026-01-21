@@ -3,7 +3,7 @@ import pandas as pd
 import altair as alt
 
 # --- 1. 頁面基礎設定 ---
-st.set_page_config(page_title="雙軌制回饋分析模型 (11階層版)", layout="wide")
+st.set_page_config(page_title="雙軌制回饋分析模型 (數值輸入版)", layout="wide")
 
 st.markdown("""
 <style>
@@ -13,7 +13,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚖️ 分潤試算工具 (11階層版)")
+st.title("⚖️ 分潤試算工具 (數值輸入版)")
 st.markdown("""
 本模型採 **雙軌疊加** 計算：
 1. **場地租金 (區間變數)**：依照 11 階層折扣率，計算場租節省區間。
@@ -23,33 +23,33 @@ st.markdown("""
 # --- 2. 側邊欄：參數設定 ---
 with st.sidebar:
     st.header("1. 營業預估收入 (Gross)")
-    ticket_gross = st.number_input("🎫 票券營業額預估", value=15_000_000, step=500000, format="%d")
-    merch_gross = st.number_input("🛍️ 商品營業額預估", value=15_000_000, step=500000, format="%d")
+    ticket_gross = st.number_input("🎫 票券營業額預估", value=14_400_000, step=100000, format="%d")
+    merch_gross = st.number_input("🛍️ 商品營業額預估", value=15_000_000, step=100000, format="%d")
     
     st.divider()
     
     st.header("2. 原始成本 (Baseline)")
-    base_rent = st.number_input("原定場租 (固定)", value=2_000_000, step=100000)
+    base_rent = st.number_input("原定場租 (固定)", value=1_900_000, step=100000)
     base_rate_pct = st.number_input("原定商品抽成 (%)", value=3.0, step=0.1)
     base_rate = base_rate_pct / 100
 
     st.divider()
 
     st.header("3. 票券抽成（按目標）")
-    st.info("設定各等級下，撥出多少 **票券營收** 給對方")
+    st.info("請直接輸入百分比數值 (例如 6.5 代表 6.5%)")
     
-    # --- 修改部分：所有滑桿上限統一為 20.0 ---
-    p0  = st.slider("Lv0. 租金減免 0% (無折扣)", 0.0, 20.0, 0.0, 0.1) / 100
-    p1  = st.slider("Lv1. 租金減免 1~10%", 0.0, 20.0, 0.5, 0.1) / 100
-    p2  = st.slider("Lv2. 租金減免 11~20%", 0.0, 20.0, 1.0, 0.1) / 100
-    p3  = st.slider("Lv3. 租金減免 21~30%", 0.0, 20.0, 1.5, 0.1) / 100
-    p4  = st.slider("Lv4. 租金減免 31~40%", 0.0, 20.0, 2.5, 0.1) / 100
-    p5  = st.slider("Lv5. 租金減免 41~50%", 0.0, 20.0, 3.5, 0.1) / 100
-    p6  = st.slider("Lv6. 租金減免 51~60%", 0.0, 20.0, 4.5, 0.1) / 100
-    p7  = st.slider("Lv7. 租金減免 61~70%", 0.0, 20.0, 5.5, 0.1) / 100
-    p8  = st.slider("Lv8. 租金減免 71~80%", 0.0, 20.0, 6.5, 0.1) / 100
-    p9  = st.slider("Lv9. 租金減免 81~90%", 0.0, 20.0, 7.5, 0.1) / 100
-    p10 = st.slider("Lv10. 租金減免 91~100%", 0.0, 20.0, 8.5, 0.1) / 100
+    # --- 修改部分：改用 st.number_input，並填入您指定的預設值 ---
+    p0  = st.number_input("Lv0. 租金減免 0% (無折扣)",  min_value=0.0, max_value=100.0, value=6.0, step=0.1, format="%.2f") / 100
+    p1  = st.number_input("Lv1. 租金減免 1~10%",      min_value=0.0, max_value=100.0, value=6.5, step=0.1, format="%.2f") / 100
+    p2  = st.number_input("Lv2. 租金減免 11~20%",     min_value=0.0, max_value=100.0, value=7.0, step=0.1, format="%.2f") / 100
+    p3  = st.number_input("Lv3. 租金減免 21~30%",     min_value=0.0, max_value=100.0, value=7.5, step=0.1, format="%.2f") / 100
+    p4  = st.number_input("Lv4. 租金減免 31~40%",     min_value=0.0, max_value=100.0, value=8.0, step=0.1, format="%.2f") / 100
+    p5  = st.number_input("Lv5. 租金減免 41~50%",     min_value=0.0, max_value=100.0, value=8.5, step=0.1, format="%.2f") / 100
+    p6  = st.number_input("Lv6. 租金減免 51~60%",     min_value=0.0, max_value=100.0, value=9.0, step=0.1, format="%.2f") / 100
+    p7  = st.number_input("Lv7. 租金減免 61~70%",     min_value=0.0, max_value=100.0, value=9.5, step=0.1, format="%.2f") / 100
+    p8  = st.number_input("Lv8. 租金減免 71~80%",     min_value=0.0, max_value=100.0, value=10.0, step=0.1, format="%.2f") / 100
+    p9  = st.number_input("Lv9. 租金減免 81~90%",     min_value=0.0, max_value=100.0, value=15.0, step=0.1, format="%.2f") / 100
+    p10 = st.number_input("Lv10. 租金減免 91~100%",   min_value=0.0, max_value=100.0, value=15.0, step=0.1, format="%.2f") / 100
     # --- 修改部分結束 ---
 
     st.divider()
@@ -57,13 +57,14 @@ with st.sidebar:
     st.header("4. 商品抽成")
     st.markdown("設定 對方談到的 **抽成減免幅度**：")
     
-    merch_reduction_pct = st.slider(
-        "減免百分比 ", 
+    # 改為輸入框
+    merch_reduction_pct = st.number_input(
+        "減免百分比 (%)", 
         min_value=0.0, 
-        max_value=base_rate_pct, 
-        value=1.0, 
+        max_value=float(base_rate_pct), 
+        value=0.0, 
         step=0.1,
-        format="%.1f%%"
+        format="%.2f"
     )
     
     # 計算商品端的固定價值與回饋
@@ -155,6 +156,7 @@ st.divider()
 st.subheader(f"🎯 情境分析 (當商品減免 {merch_reduction_pct}% 時)")
 
 chart_data = df.copy()
+# 設定圖表最大值，防止破圖，給 10% 緩衝
 max_val = max(chart_data["總支付 Cost"].max(), chart_data["總價值 Max"].max()) * 1.1
 
 base = alt.Chart(chart_data).encode(
@@ -182,7 +184,7 @@ text = base.mark_text(dy=-15, align='center', fontSize=10, fontWeight='bold').en
     y='總價值 Max', text='等級'
 )
 
-# 4. 損益平衡線
+# 4. 損益平衡線 (45度線)
 line = alt.Chart(pd.DataFrame({'x': [0, max_val], 'y': [0, max_val]})).mark_rule(
     strokeDash=[5, 5], color='gray', opacity=0.5
 ).encode(x='x', y='y')
@@ -212,7 +214,7 @@ st.dataframe(
 
 st.info(f"""
 **💡 如何解讀此圖表：**
-此圖表顯示在 **「商品抽成減免 {merch_reduction_pct}%」** 的前提下，不同 **場租談判結果 (Lv0~Lv10)** 的損益狀況。
-* 由於等級劃分變細 (10%一階)，您可以更精準地看到獲利/虧損的轉折點 (Break-even Point) 發生在哪一個等級。
-* Lv0 代表場租完全沒有折扣的基準點。
+* **X軸 (橫軸)**：您付出的總成本。
+* **Y軸 (縱軸)**：對方創造的總價值 (省下的錢)。
+* **虛線**：損益平衡線。圖形在虛線 **上方** 代表賺錢 (綠色)，在 **下方** 代表虧錢 (紅色)。
 """)
